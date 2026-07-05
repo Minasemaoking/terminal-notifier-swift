@@ -49,7 +49,8 @@ warp_notify_precmd() {
     message="$completed_command (exit $command_status, ${elapsed}s)"
   fi
 
-  "$notifier" --quiet --title "$title" --message "$message"
+  "$notifier" --quiet --backend native --title "$title" --message "$message" \
+    >/dev/null 2>&1 &!
 }
 
 add-zsh-hook preexec warp_notify_preexec

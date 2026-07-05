@@ -1,14 +1,15 @@
 # warp-notify
 
-`warp-notify` is a lightweight Swift command-line tool that asks Warp Terminal to display a desktop notification by writing a standard OSC escape sequence. It does not use macOS notification frameworks, AppKit, SwiftUI, AppleScript, shell commands, or third-party packages.
+`warp-notify` is a lightweight Swift command-line tool with two notification backends. The default native backend briefly launches an AppKit floating panel in the lower-right corner of the current display. The Warp backend writes a standard OSC escape sequence to the terminal.
 
-The tool emits OSC 9 for message-only notifications and OSC 777 when a title is present. By default it writes directly to `/dev/tty`, falling back to stdout when `/dev/tty` cannot be opened.
+The native panel joins all macOS Spaces, does not activate or focus itself, closes after about five seconds, and then the process exits. It is not a resident menu bar application. The project does not use SwiftUI, AppleScript, Objective-C runtime calls, or third-party packages.
 
 ## Requirements
 
 - macOS 13 or later
 - Swift 6
-- Warp Terminal, or another terminal that supports these OSC notification sequences
+- AppKit for the default native panel
+- Warp Terminal, or another OSC-compatible terminal, only for `--backend warp`
 
 ## Installation
 
@@ -47,8 +48,8 @@ Available options:
 ```text
 -t, --title <title>       Optional notification title
 -m, --message <message>   Message; reads stdin when omitted and stdin is not a TTY
-    --backend <backend>   auto or warp; both currently emit the same OSC sequence
-    --print               Write only to stdout
+    --backend <backend>   auto, native, or warp; auto defaults to native
+    --print               Write the OSC sequence to stdout without showing a panel
     --quiet               Suppress the non-Warp environment warning
 -h, --help                Show help
     --version             Show version
@@ -65,16 +66,18 @@ Available options:
 | `3` | Input or encoding error |
 | `4` | Output error |
 
-## Warp Settings
+## Backends
 
-For notifications to appear:
+`auto` and `native` show the AppKit panel. The panel is positioned on the display containing the mouse pointer, joins all Spaces, and is designed to remain visible when another desktop is active.
+
+`warp` emits OSC 9 or OSC 777. For Warp notifications to appear:
 
 1. Enable Notifications in Warp.
 2. Allow Warp to display notifications in macOS System Settings.
 3. Be aware that Warp may not display a desktop notification while it is in the foreground.
 4. Focus or Do Not Disturb may block the notification.
 
-The tool checks `TERM_PROGRAM`, `TERM_PROGRAM_VERSION`, and `WARP_IS_LOCAL_SHELL_SESSION` only as hints. If the environment does not appear to be Warp, it prints a warning and still emits the standard OSC sequence. Use `--quiet` to suppress that warning.
+The Warp backend checks `TERM_PROGRAM`, `TERM_PROGRAM_VERSION`, and `WARP_IS_LOCAL_SHELL_SESSION` only as hints. If the environment does not appear to be Warp, it prints a warning and still emits the standard OSC sequence. Use `--quiet` to suppress that warning.
 
 ## Notify After a Command
 
@@ -109,13 +112,13 @@ When enabled, an interactive zsh command that runs longer than the selected thre
 
 The integration is not a resident service. The shell only records the command start time and checks a small state file when the prompt returns, so idle memory use is negligible.
 
-`ShellIntegration/claude-notify-hook.sh` also adapts Claude Code's `PermissionRequest` hook to Claude Code's `terminalSequence` response format. This event fires when a permission dialog is about to be shown. The adapter is required because Claude Code hooks do not have a controlling terminal and therefore cannot write directly to `/dev/tty`. It still uses the Swift `warp-notify` executable to generate the OSC sequence and follows the same xbar enabled state.
+`ShellIntegration/claude-notify-hook.sh` handles Claude Code's `PermissionRequest` event. It launches the native panel when a permission dialog is about to be shown and follows the same xbar enabled state.
 
 `ShellIntegration/codex-notify-hook.sh` handles the Codex CLI legacy `notify` callback. Codex appends an `agent-turn-complete` JSON payload as the final command argument. For `codex-tui` sessions, the adapter sends the last assistant message through the Swift `warp-notify` executable. Codex CLI's legacy callback is emitted after a completed agent turn; it does not provide a permission-dialog event equivalent to Claude Code's `PermissionRequest` hook.
 
 ## Limitations
 
-OSC notifications do not provide the richer features of the original `terminal-notifier`. This tool does not support:
+This tool does not support:
 
 - notification group management
 - listing or removing notifications
@@ -123,9 +126,9 @@ OSC notifications do not provide the richer features of the original `terminal-n
 - sender spoofing
 - click-to-execute actions
 - click-to-open URLs
-- bypassing Focus or Do Not Disturb
+- interactive notification actions
 
-Notification display remains controlled by Warp and macOS.
+The native panel is a custom transient window, not a Notification Center notification. It will not appear in notification history. macOS can still limit window visibility in some locked-screen or secure full-screen contexts.
 
 ## Development
 

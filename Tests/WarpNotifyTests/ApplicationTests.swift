@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import WarpNotify
 
+@MainActor
 @Suite("Application", .serialized)
 struct ApplicationTests {
     @Test
@@ -46,22 +47,37 @@ struct ApplicationTests {
     @Test
     func printDoesNotAttemptToOpenTTY() {
         let terminal = SpyTerminalWriter()
-        let application = makeApplication(terminal: terminal)
+        let nativePresenter = SpyNativeNotificationPresenter()
+        let application = makeApplication(terminal: terminal, nativePresenter: nativePresenter)
 
         let exitCode = application.run(arguments: ["--message", "Complete", "--print"])
 
         #expect(exitCode == 0)
         #expect(terminal.ttyWriteAttempts == 0)
         #expect(terminal.standardOutputWrites.count == 1)
+        #expect(nativePresenter.payloads.isEmpty)
     }
 
     @Test
-    func fallsBackToStandardOutputWhenTTYIsUnavailable() {
+    func autoUsesNativePresenter() {
+        let terminal = SpyTerminalWriter()
+        let nativePresenter = SpyNativeNotificationPresenter()
+        let application = makeApplication(terminal: terminal, nativePresenter: nativePresenter)
+
+        let exitCode = application.run(arguments: ["--title", "Build", "--message", "Complete"])
+
+        #expect(exitCode == 0)
+        #expect(nativePresenter.payloads == [NotificationPayload(title: "Build", message: "Complete")])
+        #expect(terminal.ttyWriteAttempts == 0)
+    }
+
+    @Test
+    func warpFallsBackToStandardOutputWhenTTYIsUnavailable() {
         let terminal = SpyTerminalWriter()
         terminal.ttyAvailable = false
         let application = makeApplication(terminal: terminal)
 
-        let exitCode = application.run(arguments: ["--message", "Complete"])
+        let exitCode = application.run(arguments: ["--backend", "warp", "--message", "Complete"])
 
         #expect(exitCode == 0)
         #expect(terminal.ttyWriteAttempts == 1)
@@ -114,13 +130,13 @@ struct ApplicationTests {
     }
 
     @Test
-    func ttyWriteFailureReturnsOutputErrorWithoutStdoutFallback() {
+    func warpTTYWriteFailureReturnsOutputErrorWithoutStdoutFallback() {
         let terminal = SpyTerminalWriter()
         terminal.ttyWriteError = StubError.failed
         let diagnostics = SpyDiagnosticWriter()
         let application = makeApplication(terminal: terminal, diagnostics: diagnostics)
 
-        let exitCode = application.run(arguments: ["--message", "Complete"])
+        let exitCode = application.run(arguments: ["--backend", "warp", "--message", "Complete"])
 
         #expect(exitCode == 4)
         #expect(terminal.standardOutputWrites.isEmpty)
@@ -130,15 +146,26 @@ struct ApplicationTests {
     private func makeApplication(
         input: StubInput = StubInput(isTTY: true, text: ""),
         terminal: SpyTerminalWriter = SpyTerminalWriter(),
+        nativePresenter: SpyNativeNotificationPresenter = SpyNativeNotificationPresenter(),
         diagnostics: SpyDiagnosticWriter = SpyDiagnosticWriter(),
         environment: [String: String] = ["TERM_PROGRAM": "WarpTerminal"]
     ) -> WarpNotifyApplication {
         WarpNotifyApplication(
             input: input,
             terminalWriter: terminal,
+            nativePresenter: nativePresenter,
             diagnosticWriter: diagnostics,
             environment: environment
         )
+    }
+}
+
+@MainActor
+private final class SpyNativeNotificationPresenter: NativeNotificationPresenting {
+    private(set) var payloads: [NotificationPayload] = []
+
+    func present(_ payload: NotificationPayload) throws {
+        payloads.append(payload)
     }
 }
 

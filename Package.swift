@@ -11,7 +11,12 @@ let package = Package(
         .executable(name: "warp-notify", targets: ["WarpNotify"])
     ],
     targets: [
-        .executableTarget(name: "WarpNotify"),
+        .executableTarget(
+            name: "WarpNotify",
+            linkerSettings: [
+                .linkedFramework("AppKit")
+            ]
+        ),
         .testTarget(name: "WarpNotifyTests", dependencies: ["WarpNotify"]),
     ]
 )

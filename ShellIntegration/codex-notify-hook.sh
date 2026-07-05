@@ -28,4 +28,5 @@ client="$(printf '%s' "$payload" | /usr/bin/jq -r '.client // ""')"
 message="$(printf '%s' "$payload" | /usr/bin/jq -r \
     '."last-assistant-message" // ."input-messages"[-1] // "Codex turn completed"')"
 
-"$NOTIFIER" --quiet --title "Codex Complete" --message "$message"
+/usr/bin/nohup "$NOTIFIER" --quiet --backend native --title "Codex Complete" --message "$message" \
+    >/dev/null 2>&1 &

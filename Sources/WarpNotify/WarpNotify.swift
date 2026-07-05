@@ -26,9 +26,11 @@ struct WarpEnvironment: Equatable {
     }
 }
 
+@MainActor
 struct WarpNotifyApplication {
     let input: any InputReading
     let terminalWriter: any TerminalWriting
+    let nativePresenter: any NativeNotificationPresenting
     let diagnosticWriter: any DiagnosticWriting
     let environment: [String: String]
 
@@ -80,25 +82,27 @@ struct WarpNotifyApplication {
             return WarpNotifyExitCode.inputError.rawValue
         }
 
-        if !options.quiet, !WarpEnvironment(environment: environment).looksLikeWarp {
+        let usesWarpOutput = options.printOnly || options.backend == .warp
+        if usesWarpOutput, !options.quiet, !WarpEnvironment(environment: environment).looksLikeWarp {
             diagnosticWriter.writeToStandardError(
                 "warp-notify: warning: terminal does not appear to be Warp; sending OSC notification anyway\n"
             )
         }
 
-        let data: Data
-        do {
-            data = try OSCNotificationEncoder.encode(payload)
-        } catch {
-            diagnosticWriter.writeToStandardError("warp-notify: \(error)\n")
-            return WarpNotifyExitCode.inputError.rawValue
-        }
-
         do {
             if options.printOnly {
+                let data = try OSCNotificationEncoder.encode(payload)
                 try terminalWriter.writeToStandardOutput(data)
-            } else if try !terminalWriter.writeToTTY(data) {
-                try terminalWriter.writeToStandardOutput(data)
+            } else {
+                switch options.backend {
+                case .auto, .native:
+                    try nativePresenter.present(payload)
+                case .warp:
+                    let data = try OSCNotificationEncoder.encode(payload)
+                    if try !terminalWriter.writeToTTY(data) {
+                        try terminalWriter.writeToStandardOutput(data)
+                    }
+                }
             }
             return WarpNotifyExitCode.success.rawValue
         } catch {
@@ -125,10 +129,12 @@ struct WarpNotifyApplication {
 
 @main
 enum WarpNotifyCommand {
+    @MainActor
     static func main() {
         let application = WarpNotifyApplication(
             input: StandardInputReader(),
             terminalWriter: FileHandleTerminalWriter(),
+            nativePresenter: AppKitNotificationPresenter(),
             diagnosticWriter: StandardErrorWriter(),
             environment: ProcessInfo.processInfo.environment
         )

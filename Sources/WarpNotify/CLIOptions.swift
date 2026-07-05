@@ -2,6 +2,7 @@ import Foundation
 
 enum NotificationBackend: String, Equatable {
     case auto
+    case native
     case warp
 }
 
@@ -26,7 +27,7 @@ enum CLIParseError: Error, Equatable, CustomStringConvertible {
         case let .missingValue(option):
             return "missing value for \(option)"
         case let .invalidBackend(value):
-            return "invalid backend '\(value)'; expected auto or warp"
+            return "invalid backend '\(value)'; expected auto, native, or warp"
         case let .unknownOption(option):
             return "unknown option '\(option)'"
         case let .unexpectedArgument(argument):
@@ -91,7 +92,7 @@ enum CLIOptionsParser {
 }
 
 enum CLIText {
-    static let version = "warp-notify 1.0.0\n"
+    static let version = "warp-notify 2.0.0\n"
 
     static let usage = """
         Usage:
@@ -102,7 +103,7 @@ enum CLIText {
         Options:
           -t, --title <title>       Optional notification title
           -m, --message <message>   Notification message; stdin is used when omitted
-              --backend <backend>   Notification backend: auto or warp (default: auto)
+              --backend <backend>   Backend: auto, native, or warp (default: auto)
               --print               Write the OSC sequence to stdout only
               --quiet               Suppress terminal environment warnings
           -h, --help                Show this help

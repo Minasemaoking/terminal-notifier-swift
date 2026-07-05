@@ -26,9 +26,16 @@ struct CLIOptionsTests {
 
     @Test
     func rejectsInvalidBackend() {
-        #expect(throws: CLIParseError.invalidBackend("native")) {
-            try CLIOptionsParser.parse(["--backend", "native"])
+        #expect(throws: CLIParseError.invalidBackend("system")) {
+            try CLIOptionsParser.parse(["--backend", "system"])
         }
+    }
+
+    @Test
+    func parsesNativeBackend() throws {
+        let options = try CLIOptionsParser.parse(["--backend", "native"])
+
+        #expect(options.backend == .native)
     }
 
     @Test

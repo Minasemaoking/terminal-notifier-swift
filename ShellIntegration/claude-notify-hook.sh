@@ -23,6 +23,5 @@ else
     message="$(printf '%s' "$input" | /usr/bin/jq -r '.message // "Claude Code needs your attention"')"
 fi
 
-sequence="$($NOTIFIER --quiet --print --title "$title" --message "$message")" || exit 1
-
-/usr/bin/jq -n --arg terminalSequence "$sequence" '{terminalSequence: $terminalSequence}'
+/usr/bin/nohup "$NOTIFIER" --quiet --backend native --title "$title" --message "$message" \
+    >/dev/null 2>&1 &
